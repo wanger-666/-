@@ -1,0 +1,1198 @@
+﻿<!doctype html>
+<html lang="zh-CN">
+<head>
+
+
+
+    <!--必要的脚本引用-->
+    <script src="ol5/jquery-1.11.2.min.js" type="text/javascript"></script>
+    <link href="ol5/ol.css" rel="stylesheet" type="text/css" />
+    <script src="ol5/MapGis_ol_product.js" type="text/javascript"></script>
+
+
+
+
+    <meta charset="utf-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no, width=device-width" />
+    <style>
+        html,
+        body,
+        #container {
+            width: 100%;
+            height: 100%;
+            margin: 0px;
+            font-size: 13px;
+        }
+
+        #panel {
+            position: fixed;
+            background-color: white;
+            max-height: 85%;
+            overflow-y: auto;
+            top: 70px;
+            left: 30px;
+            width: 300px;
+        }
+
+            #panel .amap-lib-driving {
+                border-radius: 4px;
+                overflow: hidden;
+            }
+
+
+        #pickerBox {
+            position: absolute;
+            z-index: 9999;
+            top: 10px;
+            left: 30px;
+            width: 300px;
+        }
+
+        #pickerInput {
+            width: 200px;
+            padding: 5px 5px;
+        }
+
+        #poiInfo {
+            background: #fff;
+        }
+
+        #searchResults {
+            overflow: auto;
+            height: calc(100% - 30px);
+        }
+
+        .amap_lib_placeSearch {
+            width: 290px;
+            height: 600px;
+        }
+
+        .amap_lib_placeSearch,
+        .amap-ui-poi-picker-sugg-container {
+            border: none !important;
+        }
+
+            .amap_lib_placeSearch .poibox.highlight {
+                background-color: #CAE1FF;
+            }
+
+            .amap_lib_placeSearch .poi-more {
+                display: none !important;
+            }
+
+        .amap_lib_placeSearch_page {
+            margin: 0px;
+        }
+
+        .amap-controlbar {
+            position: absolute;
+            width: 180px;
+            height: 10px;
+        }
+
+        .amap-logo {
+            display: none !important;
+        }
+
+        .amap-copyright {
+            display: none !important;
+        }
+
+        .amap-call {
+            display: none !important;
+        }
+
+        .amap-info-combo .keyword-input {
+            height: 25px;
+            border-radius: 2px 0 0 2px;
+        }
+
+        .input-card {
+            height: 70px !important;
+            top: 10px !important;
+            right: 300px !important;
+        }
+
+        .btn {
+            width: 6rem;
+            margin: auto !important;
+        }
+
+        .input-item {
+            width: 190px !important;
+        }
+
+        #tileBox {
+            position: absolute;
+            z-index: 9999;
+            top: 70px;
+            right: 34px;
+            width: 30px;
+        }
+
+        .amap-geolocation-con {
+            right: 30px !important;
+            bottom: 100px !important;
+        }
+
+            .amap-geolocation-con .amap-geo {
+                background: #fff 5% 5% no-repeat !important;
+                background-image: url(https://www.easyicon.net/api/resizeApi.php?id=1233397&size=33) !important;
+            }
+        .amap-marker-content img {
+            display:none;
+        }
+    </style>
+    <title>路线导航</title>
+    <link rel="stylesheet" href="https://a.amap.com/jsapi_demos/static/demo-center/css/demo-center.css" />
+    <script src="https://webapi.amap.com/maps?v=1.4.11&key=71ed158dfd75e6a2895742582b3b83b7&plugin=AMap.TruckDriving,AMap.Driving,AMap.Walking,AMap.Riding,AMap.Transfer,AMap.Autocomplete,AMap.PlaceSearch,AMap.AdvancedInfoWindow,AMap.MouseTool,AMap.Geocoder"></script>
+    <script src="https://a.amap.com/jsapi_demos/static/demo-center/js/demoutils.js"></script>
+    <!-- UI组件库 1.0 -->
+    <script src="https://webapi.amap.com/ui/1.0/main.js?v=1.0.11"></script>
+    <script src="图标.js"></script>
+    <link href="imitateMapgisScale.css" rel="stylesheet" />
+</head>
+<body>
+    
+    <div id="container"></div>
+    <div class="input-card" style='width: 18rem;'>
+        <div class="input-item">
+            <input type="radio" name='func' value='rule'><span class="input-text">距离测量</span>
+            <input type="radio" name='func' value='measureArea'><span class="input-text">面积测量</span>
+        </div>
+        <div class="input-item">
+            <input id="close" type="button" class="btn" value="关闭" />
+        </div>
+    </div>
+    <div id="pickerBox">
+        <input id="pickerInput1" placeholder="输入起始地点" />
+        <input id="pickerInput2" placeholder="输入目的地点" />
+        <button onclick="showCar()">驾车</button>
+        <button onclick="showTruck()">货车</button>
+        <button onclick="showWalking()">步行</button>
+        <button onclick="showRiding()">骑行</button>\
+        <button onclick="showBus()">公交</button>
+        <button onclick="reloadPage()">刷新</button>
+        <div id="searchResults"></div>
+    </div>
+    <!--<div id="tileBox">
+        <button onclick="init()">tile</button>
+    </div>-->
+        <div id="panel"></div>
+        
+        <script type="text/javascript">
+
+            //function init() {
+            //    //$("#container").load("tile.html");
+            //    window.location.href = "tile.html";
+            //}
+
+            var map = new AMap.Map("container", {
+                viewMode: '3D',//开启3D视图,默认为关闭
+                buildingAnimation: true,//楼块出现是否带动画
+                resizeEnable: true,
+                rotateEnable: true,
+                pitchEnable: true,
+                expandZoomRange: true,
+                zoom: 10
+            });
+
+            var startPoint, endPoint;//货车专供
+            var startPoint2, endPoint2;
+
+            var driving = new AMap.Driving({});
+            var truckDriving = new AMap.TruckDriving({});
+            var transfer = new AMap.Transfer({});
+            var walking = new AMap.Walking({});
+            var riding = new AMap.Riding({});
+
+            var placeSearch = new AMap.PlaceSearch();  //构造地点查询类
+
+            //var geocoder = new AMap.Geocoder({//逆地理编码
+            //    city: "010", //城市设为北京，默认：“全国”
+            //    radius: 1000//范围，默认：500
+            //});
+
+
+            var advancedInfoWindow = new AMap.AdvancedInfoWindow({
+                autoMove: false,
+                closeWhenClickMap: true,
+                panel: 'panel',
+                offset: new AMap.Pixel(0, -20)
+            });
+
+            AMapUI.loadUI(['misc/PoiPicker'], function (PoiPicker) {
+
+                var poiPicker1 = new PoiPicker({
+                    city: "武汉市",
+                    input: 'pickerInput1',
+                    placeSearchOptions: {
+                        map: map,
+                        pageSize: 10
+                    },
+                    searchResultsContainer: 'searchResults'
+                });
+
+                var poiPicker2 = new PoiPicker({
+                    city: "武汉市",
+                    input: 'pickerInput2',
+                    placeSearchOptions: {
+                        map: map,
+                        pageSize: 10
+                    },
+                    searchResultsContainer: 'searchResults'
+                });
+
+                //初始化poiPicker
+                poiPickerReady(poiPicker1, 'start');
+                poiPickerReady(poiPicker2, 'end');
+            });
+
+            function poiPickerReady(poiPicker, type) {
+
+                window.poiPicker = poiPicker;
+
+                var marker = new AMap.Marker();
+
+                var infoWindow = new AMap.InfoWindow({
+                    offset: new AMap.Pixel(0, -20)
+                });
+
+                //选取了某个POI
+                poiPicker.on('poiPicked', function (poiResult) {
+
+                    var source = poiResult.source,
+                        poi = poiResult.item;
+                    if (source !== 'search') {
+
+                        //suggest来源的，同样调用搜索
+                        poiPicker.searchByKeyword(poi.name);
+
+                    } else {
+
+                        //console.log(poi);
+                    }
+                    marker.setMap(map);
+
+                    marker.setPosition(poi.location);
+                    if ('start' == type) {
+                        startPoint = { lnglat: [poi.location.lng, poi.location.lat] };
+                        startPoint2 = [poi.location.lng, poi.location.lat];
+                    } else {
+                        endPoint = { lnglat: [poi.location.lng, poi.location.lat] }
+                        endPoint2 = [poi.location.lng, poi.location.lat];
+                    }
+
+                    map.setCenter(marker.getPosition());
+                });
+            }
+
+            var showCar = function () {
+                document.getElementById("searchResults").style.display = "none";
+                driving.clear();
+                truckDriving.clear();
+                transfer.clear();
+                walking.clear();
+                riding.clear();
+
+                // 构造路线导航类
+                driving = new AMap.Driving({
+                    policy: AMap.DrivingPolicy.LEAST_TIME, // 其它policy参数请参考 https://lbs.amap.com/api/javascript-api/reference/route-search#m_DrivingPolicy
+                    ferry: 1, // 是否可以使用轮渡
+                    province: '京', // 车牌省份的汉字缩写
+                    map: map,
+                    panel: 'panel'
+                })
+
+
+                // 根据起终点经纬度规划驾车导航路线
+                driving.search(startPoint2, endPoint2, function (status, result) {
+                    // result 即是对应的驾车导航信息，相关数据结构文档请参考  https://lbs.amap.com/api/javascript-api/reference/route-search#m_DrivingResult
+                    if (status === 'complete') {
+                        log.success('绘制驾车路线完成')
+                    } else {
+                        log.error('获取驾车数据失败：' + result)
+                    }
+                });
+            }
+            var showTruck = function () {
+                document.getElementById("searchResults").style.display = "none";
+                driving.clear();
+                truckDriving.clear();
+                transfer.clear();
+                walking.clear();
+                riding.clear();
+
+                truckDriving = new AMap.TruckDriving({
+                    map: map,
+                    policy: 0, // 规划策略
+                    size: 1, // 车型大小
+                    width: 2.5, // 宽度
+                    height: 2, // 高度
+                    load: 1, // 载重
+                    weight: 12, // 自重
+                    axlesNum: 2, // 轴数
+                    province: '京', // 车辆牌照省份
+                    isOutline: true,
+                    outlineColor: '#ffeeee',
+                    panel: 'panel'
+                })
+
+                var path2 = []
+                path2.push(startPoint);
+                path2.push(endPoint);
+                truckDriving.search(path2, function (status, result) {
+                    // searchResult即是对应的驾车导航信息，相关数据结构文档请参考  https://lbs.amap.com/api/javascript-api/reference/route-search#m_DrivingResult
+                    if (status === 'complete') {
+                        log.success('绘制货车路线完成')
+
+                    } else {
+                        log.error('获取货车规划数据失败：' + result)
+                    }
+                })
+            }
+
+            var showWalking = function () {
+                document.getElementById("searchResults").style.display = "none";
+                driving.clear();
+                transfer.clear();
+                walking.clear();
+                truckDriving.clear();
+                riding.clear();
+
+                walking = new AMap.Walking({
+                    map: map,
+                    panel: "panel"
+                });
+
+
+                //根据起终点坐标规划步行路线
+                walking.search(startPoint2, endPoint2, function (status, result) {
+                    // result即是对应的步行路线数据信息，相关数据结构文档请参考  https://lbs.amap.com/api/javascript-api/reference/route-search#m_WalkingResult
+                    if (status === 'complete') {
+                        log.success('绘制步行路线完成')
+                    } else {
+                        log.error('步行路线数据查询失败' + result)
+                    }
+                });
+
+            }
+
+            var showRiding = function () {
+                document.getElementById("searchResults").style.display = "none";
+                driving.clear();
+                truckDriving.clear();
+                transfer.clear();
+                walking.clear();
+                riding.clear();
+
+                riding = new AMap.Riding({
+                    map: map,
+                    panel: "panel"
+                });
+                //根据起终点坐标规划骑行路线
+                riding.search(startPoint2, endPoint2, function (status, result) {
+                    // result即是对应的骑行路线数据信息，相关数据结构文档请参考  https://lbs.amap.com/api/javascript-api/reference/route-search#m_RidingResult
+                    if (status === 'complete') {
+                        log.success('绘制骑行路线完成')
+                    } else {
+                        log.error('骑行路线数据查询失败' + result)
+                    }
+                });
+            }
+
+            var showBus = function () {
+                document.getElementById("searchResults").style.display = "none";
+                driving.clear();
+                truckDriving.clear();
+                walking.clear();
+                riding.clear();
+                transfer.clear();
+
+                var transferOption = {
+                    map: map,
+                    nightflag: true, // 是否计算夜班车
+                    city: '北京市',
+                    panel: 'panel',
+                    outlineColor: '#ffeeee',
+                    autoFitView: true,
+                    policy: AMap.TransferPolicy.LEAST_TIME // 其它policy取值请参照 https://lbs.amap.com/api/javascript-api/reference/route-search#m_TransferPolicy
+                }
+
+                transfer = new AMap.Transfer(transferOption)
+
+                //根据起、终点坐标查询公交换乘路线
+                transfer.search(startPoint2, endPoint2, function (status, result) {
+                    // result即是对应的公交路线数据信息，相关数据结构文档请参考  https://lbs.amap.com/api/javascript-api/reference/route-search#m_TransferResult
+                    if (status === 'complete') {
+                        log.success('公交路线数据查询成功')
+                    } else {
+                        log.error('公交路线数据查询失败' + result)
+                    }
+                });
+            }
+
+            function reloadPage() {
+                window.location.reload()
+            }
+
+            //map.on('complete', function () {
+            //    map.setCity("武汉市");
+            //})
+
+            // 同时引入工具条插件，比例尺插件
+            AMap.plugin([
+            //   // 'AMap.ToolBar',
+                'AMap.Scale',
+                'AMap.Geolocation'
+            //   // 'AMap.ControlBar'
+            ], function () {
+            //    // 在图面添加工具条控件，工具条控件集成了缩放、平移、定位等功能按钮在内的组合控件
+            //    //map.addControl(new AMap.ToolBar({
+            //    //    offset: new AMap.Pixel(1450, 480)
+            //    //}));
+
+            //    // 在图面添加比例尺控件，展示地图在当前层级和纬度下的比例尺
+                map.addControl(new AMap.Scale());
+
+
+                // 在图面添加定位控件，用来获取和展示用户主机所在的经纬度位置
+                map.addControl(new AMap.Geolocation({
+
+                    buttonPosition: 'RB',
+                    offset: new AMap.Pixel(0, -100)
+                   }));
+
+            ////    map.addControl(new AMap.ControlBar({
+            ////        showZoomBar: false,
+            ////        showControlButton: true,
+            ////        position: {
+            ////            right: '120px',
+            ////            top: '5px'
+            ////        }
+            ////    }))
+            });
+
+
+            AMapUI.loadUI(['control/BasicControl'], function (BasicControl) {
+
+                AMapUI.loadCss('imitateMapgisZoom.css', function () {
+
+                    var zoomCtrl = new BasicControl.Zoom({
+                        
+                        theme: 'my-blue',
+                        position: 'br'
+                    });
+
+                    map.addControl(zoomCtrl);
+                });
+
+                //添加一个缩放控件
+                //map.addControl(new BasicControl.Zoom({
+                //    theme: 'my-blue',
+                //    position: {
+                //        right: '10px',
+                //        bottom: '60px'
+                //    }
+                //}));
+
+
+
+            //    //图层切换控件
+            //    map.addControl(new BasicControl.LayerSwitcher({
+            //        position: 'rt'
+            //    }));
+            });
+
+            //地图热点
+            map.on('hotspotclick', function (result) {
+                placeSearch.getDetails(result.id, function (status, result) {
+                    if (status === 'complete' && result.info === 'OK') {
+                        placeSearch_CallBack(result);
+                    }
+                });
+            });
+            //回调函数
+            function placeSearch_CallBack(data) { //infoWindow.open(map, result.lnglat);
+                var poiArr = data.poiList.pois;
+                var location = poiArr[0].location;
+                advancedInfoWindow.setContent(createContent(poiArr[0]));
+                advancedInfoWindow.open(map, location);
+            }
+            function createContent(poi) {  //信息窗体内容
+                var s = [];
+                s.push('<div class="info-title">' + poi.name + '</div><div class="info-content">' + "地址：" + poi.address);
+                s.push("电话：" + poi.tel);
+                s.push("类型：" + poi.type);
+                s.push('<div>');
+                return s.join("<br>");
+            }
+
+            ////右键
+            //var lnglat;
+
+            //map.on('rightclick', function (e) {
+            //    lnglat  = [e.lnglat.getLng(), e.lnglat.getLat()];
+            //    geocoder.getAddress(lnglat, function(status, result) {
+            //        if (status === 'complete'&&result.regeocode) {
+            //            getAddress_CallBack(result);
+            //        }
+            //    });
+            //});
+            ////回调函数
+            //function getAddress_CallBack(data) { //infoWindow.open(map, result.lnglat);
+            //    var poiArr = data.regeocode.pois;
+            //    advancedInfoWindow.setContent(createContent(poiArr[0]));
+            //    advancedInfoWindow.open(map, lnglat);
+            //}
+            //function createContent(poi) {  //信息窗体内容
+            //    var s = [];
+            //    s.push('<div class="info-title">' + poi.name + '</div><div class="info-content">' + "地址：" + poi.address);
+            //    s.push("电话：" + poi.tel);
+            //    s.push("类型：" + poi.type);
+            //    s.push('<div>');
+            //    return s.join("<br>");
+            //}
+
+            map.on('rightclick', function (e) {
+                advancedInfoWindow.setMap(map);
+                var location = [e.lnglat.getLng(), e.lnglat.getLat()];
+                advancedInfoWindow.open(map, location);
+                advancedInfoWindow.setContent('POI信息: <pre>' + e.lnglat + '</pre>');
+                //map.panTo(location);
+                //map.panBy(0, -200);
+            });
+
+            //距离、面积量测
+            var mouseTool = new AMap.MouseTool(map);
+
+            function draw(type) {
+                switch (type) {
+                    case 'rule': {
+                        mouseTool.rule({
+                            startMarkerOptions: {//可缺省
+                                icon: new AMap.Icon({
+                                    size: new AMap.Size(19, 31),//图标大小
+                                    imageSize: new AMap.Size(19, 31),
+                                    image: "https://webapi.amap.com/theme/v1.3/markers/b/start.png"
+                                })
+                            },
+                            endMarkerOptions: {//可缺省
+                                icon: new AMap.Icon({
+                                    size: new AMap.Size(19, 31),//图标大小
+                                    imageSize: new AMap.Size(19, 31),
+                                    image: "https://webapi.amap.com/theme/v1.3/markers/b/end.png"
+                                }),
+                                offset: new AMap.Pixel(-9, -31)
+                            },
+                            midMarkerOptions: {//可缺省
+                                icon: new AMap.Icon({
+                                    size: new AMap.Size(19, 31),//图标大小
+                                    imageSize: new AMap.Size(19, 31),
+                                    image: "https://webapi.amap.com/theme/v1.3/markers/b/mid.png"
+                                }),
+                                offset: new AMap.Pixel(-9, -31)
+                            },
+                            lineOptions: {//可缺省
+                                strokeStyle: "solid",
+                                strokeColor: "#FF33FF",
+                                strokeOpacity: 1,
+                                strokeWeight: 2
+                            }
+                            //同 RangingTool 的 自定义 设置，缺省为默认样式
+                        });
+                        break;
+                    }
+                    case 'measureArea': {
+                        mouseTool.measureArea({
+                            strokeColor: '#80d8ff',
+                            fillColor: '#80d8ff',
+                            fillOpacity: 0.3
+                            //同 Polygon 的 Option 设置
+                        });
+                        break;
+                    }
+                }
+            }
+            var radios = document.getElementsByName('func');
+            for (var i = 0; i < radios.length; i += 1) {
+                radios[i].onchange = function (e) {
+                    draw(e.target.value)
+                }
+            }
+            //draw('rule')
+
+            document.getElementById('close').onclick = function () {
+                mouseTool.close(true)//关闭，并清除覆盖物
+                for (var i = 0; i < radios.length; i += 1) {
+                    radios[i].checked = false;
+                }
+            }
+
+
+            var marker1, marker2, marker3, marker4, marker5, marker6
+                , marker7, marker8, marker9, marker10, marker11, marker12, marker13
+                , marker14, marker15, marker16, marker17, marker18, marker19, marker20
+                , marker21, marker22, marker23, marker24, marker25, marker26, marker27
+                , marker28, marker29, marker30, marker31, marker32, marker33, marker34
+                , marker35, marker36, marker37;
+
+            map.on('zoomchange', function () {
+                var zoom1 = map.getZoom();
+
+                if (zoom1 >= 12) {
+
+                    //图片覆盖
+                    AMapUI.loadUI(['overlay/SvgMarker'], function (SvgMarker) {
+
+                        if (!SvgMarker.supportSvg) {
+                            alert('当前环境不支持SVG');
+                        }
+
+                        marker1 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-golf',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.117333, 30.392749],//天外天高尔夫球场
+                                showPositionPoint: true
+                            });
+
+                        marker2 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-zhibo',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.172449, 30.504904],//军运会主媒体中心
+                                showPositionPoint: true
+                            });
+
+                        marker3 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-paiqiu',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.171732, 30.501001],//武汉体育中心
+                                showPositionPoint: true
+                            });
+
+                        marker4 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-tiaosan-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.065405, 30.271505],//武汉汉南通用航空机场跳伞场地
+                                showPositionPoint: true
+                            });
+
+                        marker5 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-shatanpaiqiu',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.239008, 30.498445],//汉阳江滩沙滩排球中心
+                                showPositionPoint: true
+                            });
+
+                        marker6 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-paiqiu',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.156423, 30.51837],//江汉大学体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker7 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-shejian-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [113.972447, 30.484631],//蔡甸国防园射击射箭场馆
+                                showPositionPoint: true
+                            });
+
+                        marker8 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-mashuqima',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.087898, 30.46597],//武汉商学院马术场
+                                showPositionPoint: true
+                            });
+
+                        marker9 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-youyong-copy-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.085391, 30.462929],//武汉商学院-游泳馆
+                                showPositionPoint: true
+                            });
+
+                        marker10 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-jijian-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.085678, 30.458995],//武汉商学院体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker11 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon--basketball',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.41827, 30.508288],//华中科技大学光谷体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker12 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-wangqiu-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.461475, 30.473263],//光谷国际网球中心
+                                showPositionPoint: true
+                            });
+
+                        marker13 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-ziyuan-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.462817, 30.471804],//湖北省奥林匹克体育中心体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker14 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-shuaijiao-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.431642, 30.444096],//武汉软件工程职业学院体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker15 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-golf',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.509522, 30.496705],//驿山高尔夫球场
+                                showPositionPoint: true
+                            });
+
+                        marker16 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-dingxiangyueye-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.468967, 30.504727],//（大概）陆军工程大学军械士官学校体育场馆
+                                showPositionPoint: true
+                            });
+
+                        marker17 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-junshiwuxiang-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.473588, 30.49924],//（大概）东湖新技术开发区军事五项场地
+                                showPositionPoint: true
+                            });
+
+                        marker18 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-qizihangche',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.375407, 30.574651],//东湖绿道马拉松及公路自行车场地
+                                showPositionPoint: true
+                            });
+
+                        marker19 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-Windsurfing',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.395698, 30.566716],//东湖帆船及公开水域场地（湖心亭）
+                                showPositionPoint: true
+                            });
+
+                        marker20 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-Windsurfing',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.371668, 30.543373],//（东湖南路）
+                                showPositionPoint: true
+                            });
+
+                        marker21 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-youyong-copy-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.373863, 30.55714],//（公开水域）
+                                showPositionPoint: true
+                            });
+
+                        marker22 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon--basketball',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.334773, 30.546067],//洪山体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker23 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-roudao-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.330711, 30.505586],//武汉理工大学体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker24 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-quanji-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.37855, 30.518755],//武汉体育学院体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker25 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-ziyuan-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.357384, 30.536886],//武汉大学大学生体育活动中心
+                                showPositionPoint: true
+                            });
+
+                        marker26 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-shatanpaiqiu',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.398563, 30.647869],//青山江滩沙滩排球中心
+                                showPositionPoint: true
+                            });
+
+                        marker27 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-zhusu-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.292221, 30.426887],//军运会运动员村
+                                showPositionPoint: true
+                            });
+
+                        marker28 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-jijian-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.315223, 30.438647],//武汉城市职业学院体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker29 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-tierensanxiang-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.455812, 30.25945],//江夏梁子湖铁人三项场地
+                                showPositionPoint: true
+                            });
+
+                        marker30 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-dingxiangyueye-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.294377, 30.356014],//江夏八分山定向越野场地
+                                showPositionPoint: true
+                            });
+
+                        marker31 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-taiquandao-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.260199, 30.57683],//武汉体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker32 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-zuqiu',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.269655, 30.601653],//汉口文体中心
+                                showPositionPoint: true
+                            });
+
+                        marker33 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-pingpangqiu-',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.133448, 30.636757],//武汉五环体育中心
+                                showPositionPoint: true
+                            });
+
+                        marker34 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-zuqiu',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.28437, 30.641224],//武汉全民健身中心
+                                showPositionPoint: true
+                            });
+
+                        marker35 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-kongjunwuxiang-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.298408, 30.621107],//（大概）空军预警学院体育馆
+                                showPositionPoint: true
+                            });
+
+                        marker36 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-haijunwuxiang-copy',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.458554, 31.116394],//（大概）海军工程大学木兰湖校区体育场馆及设施
+                                showPositionPoint: true
+                            });
+
+                        marker37 = new SvgMarker(
+                            new SvgMarker.Shape.IconFont({
+                                // 参见 symbol引用, http://www.iconfont.cn/plus/help/detail?helptype=code
+                                symbolJs: '图标.js',
+                                icon: 'icon-feiji',
+                                size: 40,
+                                offset: [-20, -20],
+                                //fillColor: 'green'
+                            }), {
+                                map: map,
+                                position: [114.602130, 30.677294],//（大概）空军武汉机场飞行项目场地
+                                showPositionPoint: true
+                            });
+
+                    });
+
+                }
+                else
+                    //                var markers = [marker1, marker2, marker3, marker4, marker5, marker6
+                    //, marker7, marker8, marker9, marker10, marker11, marker12, marker13
+                    //, marker14, marker15, marker16, marker17, marker18, marker19, marker20
+                    //, marker21, marker22, marker23, marker24, marker25, marker26, marker27
+                    //, marker28, marker29, marker30, marker31, marker32, marker33, marker34
+                    //, marker35, marker36, marker37];
+                    map.remove(marker1); map.remove(marker2); map.remove(marker3); map.remove(marker4);
+                map.remove(marker5); map.remove(marker6); map.remove(marker7); map.remove(marker8);
+                map.remove(marker9); map.remove(marker10); map.remove(marker11); map.remove(marker12);
+                map.remove(marker13); map.remove(marker14); map.remove(marker15); map.remove(marker16);
+                map.remove(marker17); map.remove(marker18); map.remove(marker19); map.remove(marker20);
+                map.remove(marker21); map.remove(marker22); map.remove(marker23); map.remove(marker24);
+                map.remove(marker25); map.remove(marker26); map.remove(marker27); map.remove(marker28);
+                map.remove(marker29); map.remove(marker30); map.remove(marker31); map.remove(marker32);
+                map.remove(marker33); map.remove(marker34); map.remove(marker35); map.remove(marker36);
+                map.remove(marker37); map.remove(marker1);//marker1要删两遍
+            });
+
+
+
+
+        </script>
+</body>
+</html>
